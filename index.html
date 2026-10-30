@@ -224,14 +224,15 @@ function doPush(){
     .then(function(r){if(!r.ok)throw new Error('送信エラー(HTTP '+r.status+')');noteSync('')})
     .catch(function(e){noteSync(String(e&&e.message||e))});
 }
-function doPull(){
+function doPull(force){
   if(!syncReady()||syncBusy)return;
   syncBusy=true;
   fetch(syncUrl(),{cache:'no-store'})
     .then(function(r){if(!r.ok)throw new Error('取得エラー(HTTP '+r.status+')');return r.json()})
     .then(function(data){
       syncBusy=false;
-      if(data&&data.rev&&data.rev>S.sync.rev){applyShare(data);save();refreshLite()}
+      if(data&&data.rev&&(force||data.rev>S.sync.rev)){applyShare(data);save();refreshLite()}
+      else if(force&&!(data&&data.rev)){doPush()}
       noteSync('');
     })
     .catch(function(e){syncBusy=false;noteSync(String(e&&e.message||e))});
@@ -560,7 +561,7 @@ function renderSheet(){
     h+='<div class="sec"><span class="lbl">共有(ネットワーク)— 試合の進み・勝敗・審判割当・コート数だけを、他の人の端末と共有する。同じURLとルーム名を全員の端末に設定すること。名簿の追加/除外・表示・チーム名はこの端末だけの設定で共有されない</span>';
     h+='<div class="row"><button class="btn'+(S.sync.on?' pri':'')+' wide" data-act="syncon">共有を'+(S.sync.on?'オフにする':'オンにする')+'</button></div>';
     h+='<div class="grid2" style="margin-top:8px"><input type="text" id="syncurl" placeholder="https://xxxx-default-rtdb.firebaseio.com" value="'+esc(S.sync.url)+'"><input type="text" id="syncroom" placeholder="ルーム名(大会名など)" value="'+esc(S.sync.room)+'"></div>';
-    h+='<div class="row" style="margin-top:8px"><button class="btn" data-act="syncsave">保存</button><button class="btn" data-act="syncnow">今すぐ同期</button></div>';
+    h+='<div class="row" style="margin-top:8px"><button class="btn" data-act="syncsave">保存</button><button class="btn" data-act="syncnow">今すぐ同期(DBに合わせる)</button></div>';
     h+='<div class="small" style="margin-top:6px">'+(S.sync.on?(S.sync.err?'エラー: '+esc(S.sync.err):(S.sync.last?'最終同期: '+esc(S.sync.last):'まだ同期していない')):'オフ')+'</div></div>';
     h+='<div class="sec"><span class="lbl">状態の書き出し／読み込み（再読み込み後の復元用。共有の設定も一緒に運ばれる）</span><textarea id="code" spellcheck="false" placeholder="ここに貼って「読み込む」">'+(ui.code||'')+'</textarea>';
     h+='<div class="grid2" style="margin-top:8px"><button class="btn" data-act="export">書き出す</button><button class="btn pri" data-act="import">読み込む</button></div><div class="small" id="cmsg">'+esc(ui.msg||'')+'</div></div>';
@@ -662,7 +663,7 @@ document.addEventListener('click',function(ev){
     case 'syncnow':
       S.sync.url=($('#syncurl').value||'').trim();S.sync.room=($('#syncroom').value||'').trim();
       save();ensurePull();
-      if(S.sync.on){doPull();doPush()}
+      if(S.sync.on)doPull(true);
       renderSheet();
       break;
     case 'export':
